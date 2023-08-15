@@ -1,0 +1,71 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  profile: default
+  meshConfig:
+    defaultConfig:
+      gatewayTopology:
+        numTrustedProxies: 2
+  components:
+    pilot:
+      enabled: true
+      k8s:
+        hpaSpec:
+          minReplicas: 5  # ... default 1
+          maxReplicas: 20 # ... default 5
+        priorityClassName: system-cluster-critical
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+      namespace: istio-system
+      k8s:
+        hpaSpec:
+          minReplicas: 5  # ... default 1
+          maxReplicas: 20 # ... default 5
+        priorityClassName: system-cluster-critical
+        podDisruptionBudget:
+          minAvailable: 1
+        serviceAnnotations:
+          # AWS
+          service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: Name=nlb-usea1-int-k8s-dev
+          service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: 'true'
+          service.beta.kubernetes.io/aws-load-balancer-internal: 'true'
+          service.beta.kubernetes.io/aws-load-balancer-name: nlb-usea1-int-k8s-dev
+          service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+          service.beta.kubernetes.io/aws-load-balancer-subnets: sn_app-nat_us-east-1a_dev, sn_app-nat_us-east-1b_dev, sn_app-nat_us-east-1c_dev, sn_app-nat_us-east-1d_dev, sn_app-nat_us-east-1f_dev
+
+          # Azure
+          service.beta.kubernetes.io/azure-load-balancer-internal: 'true'
+          service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "subnet-eus2-k8s-dev-96 "
+        overlays:
+          - kind: Service
+            name: istio-ingressgateway
+            patches:
+              - path: spec.externalTrafficPolicy
+                value: Local # OVERRIDDEN
+
+    - name: istio-ingressgateway-extenal
+      enabled: true
+      namespace: istio-system
+      k8s:
+        hpaSpec:
+          minReplicas: 5  # ... default 1
+          maxReplicas: 20 # ... default 5
+        priorityClassName: system-cluster-critical
+        podDisruptionBudget:
+          minAvailable: 1
+        serviceAnnotations:
+          # AWS
+          service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: Name=nlb-usea1-ext-k8s-dev
+          service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: 'true'
+          service.beta.kubernetes.io/aws-load-balancer-name: nlb-usea1-ext-k8s-dev
+          service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+          service.beta.kubernetes.io/aws-load-balancer-subnets: sn_pub_us-east-1a_dev, sn_pub_us-east-1b_dev, sn_pub_us-east-1c_dev, sn_pub_us-east-1d_dev, sn_pub_us-east-1f_dev
+        overlays:
+          - kind: Service
+            name: istio-ingressgateway-extenal
+            patches:
+              - path: spec.externalTrafficPolicy
+                value: Local # OVERRIDDEN
+      label:
+        istio: ingressgateway-external
